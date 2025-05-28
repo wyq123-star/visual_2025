@@ -154,7 +154,7 @@ controller_server:
         near_goal_distance: 0.1 # if the robot is within this distance of the goal, it will not be repelled by obstacles.
         inflation_radius: 0.4 # Radius to inflate costmap around lethal obstacles. This should be the same as for your inflation layer (Humble only)
         cost_scaling_factor: 10.0 # Exponential decay factor across inflation radius. This should be the same as for your inflation layer (Humble only)
-        inflation_layer_name: ["local_inflation_layer","global_inflation_layer"] # 
+        inflation_layer_name: "" # 
       PathAlignCritic:
         enabled: true
         cost_power: 1
@@ -352,7 +352,7 @@ planner_server:
     use_sim_time: false
     planner_plugins: ["GridBased"]
     GridBased:
-      plugin: "nav2_navfn_planner/NavfnPlanner"
+      plugin: "nav2_navfn_planner::NavfnPlanner"
       tolerance: 0.5 # 目标点容差0.5米，允许规划路径终点在此范围内
       use_astar: true # ！！！！是否启动A*算法，若false则启动Dijkstra算法，A*快速响应动态障碍，适合人员流动频繁的区域
       allow_unknown: true # 允许在位置区域通行
@@ -438,16 +438,16 @@ behavior_server:
     cycle_frequency: 10.0
     behavior_plugins: ["spin", "backup", "drive_on_heading", "assisted_teleop", "wait"]
     spin:
-      plugin: "nav2_behaviors/Spin"
+      plugin: "nav2_behaviors::Spin"
     backup:
-      plugin: "nav2_behaviors/BackUp"
+      plugin: "nav2_behaviors::BackUp"
     drive_on_heading:
-      plugin: "nav2_behaviors/DriveOnHeading"
+      plugin: "nav2_behaviors::DriveOnHeading"
     wait:
-      plugin: "nav2_behaviors/Wait"
+      plugin: "nav2_behaviors::Wait"
     assisted_teleop:
-      plugin: "nav2_behaviors/AssistedTeleop"
-    global_frame: camera_init
+      plugin: "nav2_behaviors::AssistedTeleop"
+    global_frame: map
     robot_base_frame: base_link
     transform_tolerance: 0.1 #  坐标变换容忍时间
     use_sim_time: false
