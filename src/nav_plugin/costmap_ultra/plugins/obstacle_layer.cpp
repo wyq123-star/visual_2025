@@ -104,8 +104,8 @@ void ObstacleLayerUltra::laserScanCallback(const sensor_msgs::msg::LaserScan::Co
     try
     {
         transform = tf_->lookupTransform(
-            laser_frame_,
             base_frame_,
+            laser_frame_,
             last_update_time_,
             rclcpp::Duration::from_seconds(_transform_tolerance));
     }
@@ -136,17 +136,18 @@ void ObstacleLayerUltra::laserScanCallback(const sensor_msgs::msg::LaserScan::Co
         // }
 
         // 计算点坐标并添加到点云
-        float x = range * std::cos(current_angle);
-        float y = range * std::sin(current_angle);
-        x_bias += x; // 添加偏移量
-        y_bias += y; // 添加偏移量
-        float range_transformed = std::sqrt(x_bias * x_bias + y_bias * y_bias);
+        float x_laser = range * std::cos(current_angle);
+        float y_laser = range * std::sin(current_angle);
+        float x_base = x_laser + x_bias; // 将点从激光坐标系转换到base_link坐标系
+        float y_base = y_laser + y_bias;
+        // y_bias += y; // 添加偏移量
+        float range_transformed = std::sqrt(x_base * x_base + y_base * y_base);
         if (range_transformed < _obstacle_min_range || range_transformed > _obstacle_max_range)
         {
             current_angle += scan->angle_increment; // 角度递增
             continue;                               // 跳过不在障碍物检测范围内的点
         }
-        cloud_ptr_->points.emplace_back(pcl::PointXYZ{x, y, 0.0});
+        cloud_ptr_->points.emplace_back(pcl::PointXYZ{x_laser, y_laser, 0.0});
 
         // 更新角度（注意：应在处理完当前点后更新角度）
         current_angle += scan->angle_increment;
