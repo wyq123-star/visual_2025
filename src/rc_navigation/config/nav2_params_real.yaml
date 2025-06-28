@@ -132,7 +132,7 @@ controller_server:
         cost_weight: 8.0
         threshold_to_consider: 3.0 #距离三米开始对齐
 
-      GoalCritic: 鼓励机器人靠近最终目标位置
+      GoalCritic: # 鼓励机器人靠近最终目标位置
         enabled: true
         cost_power: 1
         cost_weight: 5.0
