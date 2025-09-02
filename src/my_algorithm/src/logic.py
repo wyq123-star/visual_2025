@@ -7,7 +7,6 @@ from geometry_msgs.msg import PoseArray, PoseStamped, Point
 from rcl_interfaces.msg import ParameterDescriptor, ParameterType, SetParametersResult
 from tf2_ros import Buffer, TransformException, TransformListener  # 新增TF2相关导入
 
-
 class OptimalPointSelector(Node):
     def __init__(self):
         super().__init__('optimal_point_selector')
@@ -41,7 +40,7 @@ class OptimalPointSelector(Node):
                               ParameterDescriptor(description='机器人坐标系', type=ParameterType.PARAMETER_STRING))
         self.declare_parameter('dist_decay', 1.5,
                               ParameterDescriptor(description='距离衰减因子', type=ParameterType.PARAMETER_DOUBLE))
-        
+
         self.points_sub = self.create_subscription(
             PoseArray,
             '/points_select',

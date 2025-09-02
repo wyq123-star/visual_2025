@@ -72,7 +72,7 @@ bt_navigator_navigate_to_pose_rclcpp_node:
 controller_server:
   ros__parameters:
     use_sim_time: False
-    controller_frequency: 40.0
+    controller_frequency: 20.0
     min_x_velocity_threshold: 0.005
     min_y_velocity_threshold: 0.005
     min_theta_velocity_threshold: 0.01
@@ -102,11 +102,11 @@ controller_server:
       adjustHeadingSpeed: 0.2 # angular speed to adjust heading
       # 
       time_steps: 40 # prediction horizon = time_steps x model_dt = 3s
-      model_dt: 0.025 # =1/controller_frequency
-      batch_size: 3000 # Count of randomly sampled candidate trajectories from current optimal control sequence in a given iteration. 1000 @ 50 Hz or 2000 @ 30 Hz seems to produce good results.
+      model_dt: 0.05 # =1/controller_frequency
+      batch_size: 2000 # Count of randomly sampled candidate trajectories from current optimal control sequence in a given iteration. 1000 @ 50 Hz or 2000 @ 30 Hz seems to produce good results.
       vx_std: 0.5
       vy_std: 0.5
-      wz_std: 0.6
+      wz_std: 0.2
       vx_max: 3.0 # prediction horizon x vx_max = 3.0 m -->local costmap dim should larger than 3.0 x 2 = 6m
       vx_min: -3.0 # Maximum reverse velocity (m/s).
       vy_max: 3.8
@@ -129,8 +129,8 @@ controller_server:
       #   min_turning_r: 0.2
       critics: ["ObstaclesCritic", "GoalCritic", "PathAlignCritic", "PathFollowCritic", "TwirlingCritic","GoalAngleCritic"]
       GoalAngleCritic: # 当机器人距离目标点较近时，鼓励它调整角度朝向目标的朝向
-        cost_weight: 8.0
-        threshold_to_consider: 3.0 #距离三米开始对齐
+        cost_weight: 10.0
+        threshold_to_consider: 0.8 #距离三米开始对齐
 
       GoalCritic: #鼓励机器人靠近最终目标位置
         enabled: true
@@ -184,7 +184,7 @@ controller_server:
       TwirlingCritic:
         enabled: true
         twirling_cost_power: 1
-        twirling_cost_weight: 10.0
+        twirling_cost_weight: 15.0
 # local_costmap:
 #   plugins: ["obstacle_layer", "voxel_layer", "inflation_layer"]  # 添加 obstacle_layer
 #   obstacle_layer:
@@ -200,15 +200,15 @@ controller_server:
 local_costmap:
   local_costmap:
     ros__parameters:
-      update_frequency: 10.0  # 代价地图更新频率(Hz)
-      publish_frequency: 10.0 # 地图数据发布频率(Hz)
+      update_frequency: 20.0  # 代价地图更新频率(Hz)
+      publish_frequency: 20.0 # 地图数据发布频率(Hz)
       global_frame: odom     # 全局坐标系（使用里程计坐标系）
       robot_base_frame: base_link  # 机器人本体坐标系
       use_sim_time: false     # 使用仿真时间
       rolling_window: true   # 启用滚动窗口模式
       transform_tolerance: 1.0 # 坐标变换容忍时间
-      width: 10   # 地图宽度3米
-      height: 10  # 地图高度3米
+      width: 15   # 地图宽度3米
+      height: 15  # 地图高度3米
       resolution: 0.05     # 分辨率5cm/格
       robot_radius: 0.22   # 机器人碰撞半径22cm
       plugins: ["obstacle_layer", "inflation_layer"] # 激活的层级
@@ -237,6 +237,7 @@ local_costmap:
         enabled: True
         cost_scaling_factor: 2.0
         inflation_radius: 1.20 
+        inflate_unknown: false
       always_send_full_costmap: True # 始终发布完整地图
                         
 
@@ -280,7 +281,7 @@ global_costmap:
       use_sim_time: false
       robot_radius: 0.22 # 机器人碰撞半径0.22米，用于膨胀层生成避障区域
       resolution: 0.05 # 地图分辨率为5厘米/像素
-      track_unknown_space: true # 将未知区域视为可通行区域
+      track_unknown_space: False # 将未知区域视为可通行区域
       plugins: ["static_layer", "obstacle_layer","inflation_layer"]
       obstacle_layer:
         plugin: "nav2_costmap_2d::ObstacleLayerUltra"
@@ -305,10 +306,12 @@ global_costmap:
       static_layer:  # 静态地图层
         plugin: "nav2_costmap_2d::StaticLayer"
         map_subscribe_transient_local: True
+        unknown_value_to_free: False
       inflation_layer:
         plugin: "nav2_costmap_2d::InflationLayer"
         cost_scaling_factor: 2.0 # 代价值随距离的衰减系数，值越大衰减越快
         inflation_radius: 1.20
+        inflate_unknown: false
       always_send_full_costmap: True
 
 map_server:
@@ -336,7 +339,7 @@ planner_server:
       plugin: "nav2_navfn_planner/NavfnPlanner"
       tolerance: 0.1 # 目标点容差0.5米，允许规划路径终点在此范围内
       use_astar: true # ！！！！是否启动A*算法，若false则启动Dijkstra算法，A*快速响应动态障碍，适合人员流动频繁的区域
-      allow_unknown: true # 允许在位置区域通行
+      allow_unknown: False # 允许在位置区域通行
 smoother_server:
   ros__parameters:
     use_sim_time: True
@@ -358,8 +361,8 @@ smoother_server:
       path_upsampling_factor: 1     # 0 - path remains downsampled, 1 - path is upsampled back to original granularity using cubic bezier, 2... - more upsampling
       keep_start_orientation: false  # whether to prevent the start orientation from being smoothed
       keep_goal_orientation: false   # whether to prevent the gpal orientation from being smoothed
-      minimum_turning_radius: 0.40  # minimum turning radius the robot can perform. Can be set to 0.0 (or w_curve can be set to 0.0 with the same effect) for diff-drive/holonomic robots
-      w_curve: 30.0                 # weight to enforce minimum_turning_radius
+      minimum_turning_radius: 0.50  # minimum turning radius the robot can perform. Can be set to 0.0 (or w_curve can be set to 0.0 with the same effect) for diff-drive/holonomic robots
+      w_curve: 0.0                 # weight to enforce minimum_turning_radius
       w_dist: 0.0                   # weight to bind path to original as optional replacement for cost weight
       w_smooth: 2000000.0           # weight to maximize smoothness of path
       w_cost: 100.0                 # weight to steer robot away from collision and cost
@@ -425,7 +428,7 @@ velocity_smoother:
     feedback: "OPEN_LOOP"
     max_velocity: [3.0, 3.0, 4.0] # 最大速度限制
     min_velocity: [-3.0, -3.0, -4.0] # 最小速度限制
-    max_accel: [2.0, 2.0, 2.0] # 最大加速度限制
-    max_decel: [-2.0, -2.0, -2.0]
+    max_accel: [1.5, 1.5, 2.0] # 最大加速度限制
+    max_decel: [-1.5, -1.5, -2.0]
     deadband_velocity: [0.0, 0.0, 0.0] # 速度死区，忽略微小速度指令
-    velocity_timeout: 1.0
+    velocity_timeout: 0.2

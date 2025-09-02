@@ -146,7 +146,6 @@ class EnhancedNavigationHandler:
                     self.pending_goal = None
         return result
 
-
     def set_goal(self, point):
         self.best_goal = point
 
@@ -229,7 +228,6 @@ class EnhancedNavigationHandler:
             current_pose.transform.rotation.z, 
             current_pose.transform.rotation.w) * 2.0)
         
-
         # target_yaw = self.normalize_angle(math.atan2(
         #     self.center_y - point.y, 
         #     self.center_x - point.x))
@@ -325,7 +323,6 @@ class EnhancedNavigationHandler:
             if nav_state == "IDLE":
                 self.handle_reset = True
             
-
 
 class OptimalGoalNavigator(Node):
     """最优目标导航节点"""
