@@ -72,7 +72,7 @@ bt_navigator_navigate_to_pose_rclcpp_node:
 controller_server:
   ros__parameters:
     use_sim_time: False
-    controller_frequency: 20.0
+    controller_frequency: 25.0
     min_x_velocity_threshold: 0.0005
     min_y_velocity_threshold: 0.0005
     min_theta_velocity_threshold: 0.0001
@@ -101,8 +101,8 @@ controller_server:
       minAngleDiff: 365.0 # if the angle difference is larger than this value, the robot will continue to adjust heading
       adjustHeadingSpeed: 0.2 # angular speed to adjust heading
       # 
-      time_steps: 40 # prediction horizon = time_steps x model_dt = 3s
-      model_dt: 0.05 # =1/controller_frequency
+      time_steps: 50 # prediction horizon = time_steps x model_dt = 3s
+      model_dt: 0.04 # =1/controller_frequency
       batch_size: 3000 # Count of randomly sampled candidate trajectories from current optimal control sequence in a given iteration. 1000 @ 50 Hz or 2000 @ 30 Hz seems to produce good results.
       vx_std: 0.5
       vy_std: 0.5
@@ -206,8 +206,8 @@ local_costmap:
       robot_base_frame: base_link  # 机器人本体坐标系
       use_sim_time: True     # 使用仿真时间
       rolling_window: true   # 启用滚动窗口模式
-      width: 7   # 地图宽度3米
-      height: 7  # 地图高度3米
+      width: 15   # 地图宽度3米
+      height: 15  # 地图高度3米
       resolution: 0.05     # 分辨率5cm/格
       robot_radius: 0.22   # 机器人碰撞半径22cm
       plugins: ["obstacle_layer", "inflation_layer"] # 激活的层级

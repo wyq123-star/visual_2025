@@ -104,9 +104,6 @@ private:
         {
             clear_count_ = 0;
             obstacle_pub_->publish(obstacles);
-            RCLCPP_INFO(this->get_logger(), "发布 %ld 个障碍点 | 区域: (%.2f,%.2f)~(%.2f,%.2f)",
-                        obstacles.poses.size(), region_x_min, region_y_min,
-                        region_x_max, region_y_max);
             print_obstacle_info(obstacles, res, width, height);
         }
         else
@@ -130,10 +127,6 @@ private:
     void print_obstacle_info(const geometry_msgs::msg::PoseArray &obstacles,
                              double resolution, uint32_t width, uint32_t height)
     {
-        RCLCPP_DEBUG(this->get_logger(), "==============================");
-        RCLCPP_DEBUG(this->get_logger(), "检测到 %ld 个障碍点", obstacles.poses.size());
-        RCLCPP_DEBUG(this->get_logger(), "代价地图尺寸: %u x %u (%.2f m x %.2f m)",
-                     width, height, width * resolution, height * resolution);
 
         // 仅当障碍点较少时打印详细信息
         if (obstacles.poses.size() <= 20)
@@ -141,11 +134,8 @@ private:
             for (size_t i = 0; i < obstacles.poses.size(); ++i)
             {
                 const auto &pose = obstacles.poses[i];
-                RCLCPP_DEBUG(this->get_logger(), "障碍点 %zu: (%.2f, %.2f)",
-                             i + 1, pose.position.x, pose.position.y);
             }
         }
-        RCLCPP_DEBUG(this->get_logger(), "==============================");
     }
 
     // 参数回调函数（支持动态更新区域）

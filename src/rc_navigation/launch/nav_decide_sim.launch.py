@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, LogInfo
-from launch.substitutions import PathJoinSubstitution, LaunchConfiguration, TextSubstitution
+from launch.substitutions import PathJoinSubstitution, LaunchConfiguration
 from launch_ros.actions import Node
 from launch_ros.substitutions import FindPackageShare
-from launch.launch_context import LaunchContext
+from launch_ros.parameter_descriptions import ParameterFile  # 关键修改：导入参数文件加载器
 
 def generate_launch_description():
     config_file_path = PathJoinSubstitution([
@@ -19,38 +19,38 @@ def generate_launch_description():
         description='全局参数配置文件路径'
     )
     
-    # 创建上下文用于解析路径
-    context = LaunchContext()
-    resolved_config_path = config_file_path.perform(context)
+    # 使用ParameterFile加载YAML内容
+    param_file = ParameterFile(
+        LaunchConfiguration('config_file'),
+        allow_substs=True
+    )
 
     nodes = [
-        # RandomPointGenerator节点
         Node(
             package='my_algorithm',
             executable='random_generate.py',
             name='random_generate',
-            parameters=[LaunchConfiguration('config_file')]
+            parameters=[param_file]  # 传递参数内容而非路径
         ),
-        # ObstacleExtractor节点
         Node(
             package='change_laser',
             executable='obstacle_extractor_node',
             name='obstacle_extractor',
-            parameters=[LaunchConfiguration('config_file')]
+            parameters=[param_file]  # 所有节点共用同一参数文件
         ),
-        # OptimalPointSelector节点
         Node(
             package='my_algorithm',
             executable='logic.py',
             name='optimal_point_selector',
-            parameters=[LaunchConfiguration('config_file')]
+            parameters=[param_file]
         ),
-        # OptimalGoalNavigator节点
         Node(
             package='my_algorithm',
             executable='nav_behave.py',
+            emulate_tty=True,
+            output='screen',
             name='optimal_goal_navigator',
-            parameters=[LaunchConfiguration('config_file')]
+            parameters=[param_file]
         )
     ]
     
@@ -58,5 +58,5 @@ def generate_launch_description():
         config_path_arg,
         LogInfo(msg="启动导航决策..."),
         *nodes,
-        LogInfo(msg=f"参数文件路径: {resolved_config_path}") 
+        LogInfo(msg=f"参数文件路径: {config_file_path}") 
     ])

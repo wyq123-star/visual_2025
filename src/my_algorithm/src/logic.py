@@ -5,9 +5,8 @@ import math
 import numpy as np
 from geometry_msgs.msg import PoseArray, PoseStamped, Point
 from rcl_interfaces.msg import ParameterDescriptor, ParameterType, SetParametersResult
-from tf2_ros import TransformListener, Buffer
-import tf2_ros
-from geometry_msgs.msg import TransformStamped
+from tf2_ros import Buffer, TransformException, TransformListener  # 新增TF2相关导入
+
 
 class OptimalPointSelector(Node):
     def __init__(self):
@@ -34,22 +33,15 @@ class OptimalPointSelector(Node):
                               ParameterDescriptor(description='机器人距离评分权重', type=ParameterType.PARAMETER_DOUBLE))
         self.declare_parameter('max_diff', 3.0,
                               ParameterDescriptor(description='最大允许半径差值', type=ParameterType.PARAMETER_DOUBLE))
-        self.declare_parameter('map_frame', 'map', 
+        self.declare_parameter('d', 1.0,
+                              ParameterDescriptor(description='机器人距离评分参数', type=ParameterType.PARAMETER_DOUBLE))
+        self.declare_parameter('map_frame', 'map',
                               ParameterDescriptor(description='地图坐标系', type=ParameterType.PARAMETER_STRING))
-        self.declare_parameter('robot_frame', 'base_link', 
+        self.declare_parameter('robot_frame', 'base_link',
                               ParameterDescriptor(description='机器人坐标系', type=ParameterType.PARAMETER_STRING))
-        # 新增距离衰减因子参数
-        self.declare_parameter('dist_decay', 1.5, 
+        self.declare_parameter('dist_decay', 1.5,
                               ParameterDescriptor(description='距离衰减因子', type=ParameterType.PARAMETER_DOUBLE))
         
-        # 初始化TF监听器
-        self.tf_buffer = Buffer()
-        self.tf_listener = TransformListener(self.tf_buffer, self)
-        self.current_robot_position = Point(x=0.0, y=0.0, z=0.0)  # 存储机器人当前位置
-        self.robot_position_valid = False  # 位置有效性标志
-        self.robot_position_time = self.get_clock().now()  # 记录最后有效位置时间
-        
-        # 订阅话题
         self.points_sub = self.create_subscription(
             PoseArray,
             '/points_select',
@@ -90,9 +82,12 @@ class OptimalPointSelector(Node):
         self.obstacle_points = []
         self.obstacle_data_received = False  # 新增：标记是否收到障碍物数据
         
-        # 创建定时器更新机器人位置
-        self.update_rate = 10.0  # Hz
-        self.timer = self.create_timer(1.0/self.update_rate, self.update_robot_position)
+
+        # 新增：TF2相关初始化
+        self.tf_buffer = Buffer()
+        self.tf_listener = TransformListener(self.tf_buffer, self)
+        self.get_logger().info("TF2监听器已初始化")
+
         
         # 参数变更回调
         self.add_on_set_parameters_callback(self.param_callback)
@@ -150,17 +145,8 @@ class OptimalPointSelector(Node):
         """障碍物数据回调"""
         self.obstacle_points = [pose.position for pose in msg.poses]
         self.obstacle_data_received = True  # 标记已收到障碍物数据
-        self.get_logger().info(
-            f"收到 {len(self.obstacle_points)} 个障碍物点", 
-            throttle_duration_sec=2
-        )
         
-        # 打印前5个障碍物点位置
-        if len(self.obstacle_points) > 0:
-            obstacle_info = []
-            for i, obs in enumerate(self.obstacle_points[:5]):
-                obstacle_info.append(f"障碍物{i+1}: ({obs.x:.2f}, {obs.y:.2f})")
-            self.get_logger().info(f"障碍物位置(前5个): {'; '.join(obstacle_info)}")
+
     
     def optimal_point_callback(self, msg):
         """最优点的回调函数 - 转换为Point格式发布"""
@@ -170,10 +156,7 @@ class OptimalPointSelector(Node):
         point_msg.z = msg.pose.position.z
         
         self.optimal_point_data_pub.publish(point_msg)
-        self.get_logger().debug(
-            f"转换并发布Point格式的最优点: ({point_msg.x:.2f}, {point_msg.y:.2f}, {point_msg.z:.2f})",
-            throttle_duration_sec=1
-        )
+
     
     def points_callback(self, msg):
         """候选点数据回调 - 即使TF查询失败也继续计算"""
@@ -201,7 +184,13 @@ class OptimalPointSelector(Node):
         c = self.get_parameter('c').value
         d = self.get_parameter('d').value
         max_diff = self.get_parameter('max_diff').value
-        dist_decay = self.get_parameter('dist_decay').value  # 新增距离衰减因子
+
+        # 新增距离评分参数
+        d = self.get_parameter('d').value
+        map_frame = self.get_parameter('map_frame').value
+        robot_frame = self.get_parameter('robot_frame').value
+        dist_decay = self.get_parameter('dist_decay').value
+
         
         center = Point(x=center_x, y=center_y)
         refer = Point(x=refer_x, y=refer_y)
@@ -209,9 +198,27 @@ class OptimalPointSelector(Node):
         # 计算每个点的原始得分
         raw_obstacle_scores = []
         raw_angle_scores = []
-        raw_robot_distances = []  # 存储到机器人的距离
+
+        # 新增：距离得分
+        raw_distance_scores = []
+        has_tf = True  # 标记是否成功获取TF变换
+
         
         self.get_logger().info("开始计算候选点得分...")
+        
+        # 新增：尝试获取机器人当前位置（非阻塞式）
+        robot_position = None
+        try:
+            # 获取最新的变换（非阻塞）
+            transform = self.tf_buffer.lookup_transform(
+                map_frame, robot_frame, rclpy.time.Time())
+            robot_position = Point()
+            robot_position.x = transform.transform.translation.x
+            robot_position.y = transform.transform.translation.y
+            self.get_logger().info(f"成功获取机器人位置: ({robot_position.x:.2f}, {robot_position.y:.2f})")
+        except TransformException as ex:
+            self.get_logger().warn(f"无法获取机器人位置: {ex}")
+            has_tf = False
         
         # 检查是否收到障碍物数据
         if not self.obstacle_data_received or not self.obstacle_points:
@@ -229,23 +236,22 @@ class OptimalPointSelector(Node):
             angle_score = self.calculate_angle_score(pose.position, center, refer)
             raw_angle_scores.append(angle_score)
             
-            # 计算到机器人的距离
-            if self.robot_position_valid:
-                dist = self.calculate_distance(pose.position, self.current_robot_position)
-                raw_robot_distances.append(dist)
+
+            # 新增：计算距离得分（如果成功获取机器人位置）
+            if has_tf and robot_position:
+                dist = self.calculate_distance(pose.position, robot_position)
+                # 使用衰减因子法计算距离得分（距离越近得分越高）
+                distance_score = math.exp(-dist * dist_decay)
+                raw_distance_scores.append(distance_score)
             else:
-                # TF查询失败时，设置距离为0（不影响其他评分项）
-                raw_robot_distances.append(0.0)
+                raw_distance_scores.append(0.0)
+
         
         # 半径匹配评分（所有点相同）
         actual_dist = self.calculate_distance(center, refer)
         radius_diff = abs(actual_dist - comd_r)
         radius_score = min(radius_diff, max_diff)  # 限制在最大差值范围内
         
-        self.get_logger().info(
-            f"半径参数: 指令半径={comd_r:.2f}, 实际距离={actual_dist:.2f}, "
-            f"差值={radius_diff:.2f}, 最终得分={radius_score:.2f}"
-        )
         
         # 归一化处理
         if not self.obstacle_data_received or not self.obstacle_points:
@@ -258,31 +264,7 @@ class OptimalPointSelector(Node):
         norm_angle = [1 - (angle/90) for angle in raw_angle_scores]  # 角度越小越好
         norm_radius = 1 - (radius_score / max_diff)  # 差值越小越好
         
-        # 机器人距离归一化（使用改进的指数衰减方法）
-        norm_robot = self.normalize_robot_distance(
-            raw_robot_distances, 
-            self.robot_position_valid,
-            dist_decay
-        )
-        
-        # 打印归一化得分统计信息
-        if norm_obstacle:
-            self.get_logger().info(
-                f"障碍物得分范围: 原始[{min(raw_obstacle_scores):.2f}-{max(raw_obstacle_scores):.2f}] "
-                f"归一化[{min(norm_obstacle):.2f}-{max(norm_obstacle):.2f}]"
-            )
-        if norm_angle:
-            min_angle = min(raw_angle_scores)
-            max_angle = max(raw_angle_scores)
-            self.get_logger().info(
-                f"角度得分范围: 原始角度[{min_angle:.1f}°-{max_angle:.1f}°] "
-                f"归一化[{min(norm_angle):.2f}-{max(norm_angle):.2f}]"
-            )
-        if self.robot_position_valid and norm_robot:
-            self.get_logger().info(
-                f"机器人距离得分范围: 原始距离[{min(raw_robot_distances):.2f}-{max(raw_robot_distances):.2f}m] "
-                f"归一化[{min(norm_robot):.2f}-{max(norm_robot):.2f}]"
-            )
+
         
         # 计算综合得分（新增d * norm_robot）
         total_scores = []
@@ -290,7 +272,8 @@ class OptimalPointSelector(Node):
             total = (a * norm_obstacle[i] + 
                      b * norm_angle[i] + 
                      c * norm_radius +
-                     d * norm_robot[i])  # 新增距离评分项
+                     d * raw_distance_scores[i])  # 新增距离评分项
+
             total_scores.append(total)
         
         # 找到最佳点
@@ -310,22 +293,10 @@ class OptimalPointSelector(Node):
             f"综合得分: {best_score:.3f} = "
             f"{a:.1f}*{norm_obstacle[best_index]:.3f}(障碍) + "
             f"{b:.1f}*{norm_angle[best_index]:.3f}(角度) + "
-            f"{c:.1f}*{norm_radius:.3f}(半径)"
+            f"{c:.1f}*{norm_radius:.3f}(半径) + "
+            f"{d:.1f}*{raw_distance_scores[best_index]:.3f}(距离)"  # 新增距离评分输出
         )
-        
-        if self.robot_position_valid:
-            log_message += f" + {d:.1f}*{norm_robot[best_index]:.3f}(距离)"
-        else:
-            log_message += " + 0.000(距离无效)"
-            
-        self.get_logger().info(log_message)
-        
-        # 打印所有点的得分统计
-        if len(total_scores) > 1:
-            self.get_logger().info(
-                f"得分统计: 最高={max(total_scores):.3f}, 最低={min(total_scores):.3f}, "
-                f"平均={np.mean(total_scores):.3f}, 标准差={np.std(total_scores):.3f}"
-            )
+
     
     def calculate_obstacle_score(self, candidate, obstacles):
         """计算到最近障碍物的距离"""
@@ -355,7 +326,6 @@ class OptimalPointSelector(Node):
         norm_cand = math.sqrt(vec_cand[0]**2 + vec_cand[1]**2)
         
         if norm_ref < 1e-6 or norm_cand < 1e-6:
-            self.get_logger().warn("检测到零向量，使用默认角度值90°")
             return 90.0  # 处理零向量情况
             
         # 计算夹角余弦值（限制在[-1,1]范围内）
@@ -369,11 +339,6 @@ class OptimalPointSelector(Node):
         # 取锐角（0-90度）
         acute_angle = min(angle_deg, 180 - angle_deg)
         
-        self.get_logger().debug(
-            f"点({candidate.x:.2f},{candidate.y:.2f})角度差: {acute_angle:.1f}° "
-            f"(参考向量:({vec_ref[0]:.2f},{vec_ref[1]:.2f}) "
-            f"候选向量:({vec_cand[0]:.2f},{vec_cand[1]:.2f}))"
-        )
         return acute_angle
     
     def calculate_distance(self, p1, p2):
@@ -381,7 +346,6 @@ class OptimalPointSelector(Node):
         dx = p1.x - p2.x
         dy = p1.y - p2.y
         dist = math.sqrt(dx**2 + dy**2)
-        self.get_logger().debug(f"距离计算: ({p1.x:.2f},{p1.y:.2f})到({p2.x:.2f},{p2.y:.2f}) = {dist:.2f}")
         return dist
     
     def normalize_scores(self, scores, higher_better=True):
@@ -404,7 +368,6 @@ class OptimalPointSelector(Node):
             # 对于距离得分，距离越小得分越高
             normalized = [(max_score - s) / score_range for s in scores]
         
-        self.get_logger().debug(f"归一化: 原始范围[{min_score:.2f}-{max_score:.2f}] -> [0.0-1.0]")
         return normalized
     
     def normalize_robot_distance(self, distances, valid_position, decay_factor=1.5):

@@ -2,10 +2,10 @@
   ros__parameters:
     coordinate_precision: "high" # 可选择生成的随机点精度，与第二个参数一起使用，高精度为小数点后若干位浮点数
     decimal_places: 1  # 低精度会使得生成点的坐标是小数点后x位，x由本参数指定
-    map_x: 7.0         # 设定赛场边界，|x|的最大值，可取正取负
-    map_y: -14.0       # 设定赛场边界，|y|的最大值，可取正取负，正负值代表正负方向
-    center_x: 3.5      # 球筐x坐标
-    center_y: -14.0    # 球筐y坐标
+    map_x: 14.0         # 设定赛场边界，|x|的最大值，可取正取负
+    map_y: 7.0       # 设定赛场边界，|y|的最大值，可取正取负，正负值代表正负方向
+    center_x: 14.0      # 球筐x坐标
+    center_y: 3.5    # 球筐y坐标
     origin_x: 0.0      # 起始点x坐标
     origin_y: 0.0      # 起始点y坐标
     radius_min: 3.0    # 生成随机点最小半径
@@ -20,14 +20,14 @@
 
 /optimal_point_selector:  # OptimalPointSelector节点命名空间
   ros__parameters:
-    center_x: 3.5  # 篮筐（圆心）x坐标
-    center_y: -14.0 # 篮筐（圆心）y坐标
-    refer_point_x: 3.5 # 辅助点（篮筐的对长点）x坐标
-    refer_point_y: 0.0 # 辅助点（篮筐的对长点）y坐标
+    center_x: 14.0  # 篮筐（圆心）x坐标
+    center_y: 3.5 # 篮筐（圆心）y坐标
+    refer_point_x: 0.0 # 辅助点（篮筐的对长点）x坐标
+    refer_point_y: 3.5 # 辅助点（篮筐的对长点）y坐标
     comd_r: 2.5 # 指令半径（最佳投球半径）
-    a: 1.0 # 障碍物评分参数
-    b: 1.0 # 角度评分参数
-    c: 1.0 # 半径匹配评分参数
+    a: 3.0 # 障碍物评分参数
+    b: 2.0 # 角度评分参数
+    c: 3.0 # 半径匹配评分参数
     d: 1.0 # 机器人距离评分参数
     map_frame: map
     robot_frame: base_link
@@ -40,11 +40,13 @@
     # 划定障碍点采纳区间
     region_origin_x: 0.0  # 障碍点采纳区间原点x
     region_origin_y: 0.0  # 原点y
-    region_xlength: 7.0  # 障碍点采纳区间x长度
-    region_ylength: -14.0  # y长度 
+    region_xlength: 14.0  # 障碍点采纳区间x长度
+    region_ylength: 7.0  # y长度 
 
 /optimal_goal_navigator:  # OptimalGoalNavigator节点命名空间
   ros__parameters:
     is_dynamic: false  # 是否允许导航动态打断，允许最优点变化
     goal_timeout: 60.0 # 导航超时时间
     max_failures: 20   # 导航最大重试次数
+    center_x: 14.0  # 篮筐（圆心）x坐标
+    center_y: 3.5 # 篮筐（圆心）y坐标
